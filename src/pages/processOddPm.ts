@@ -4,6 +4,9 @@ import pkg from 'fontoxpath';
 const {evaluateXPathToBoolean} = pkg;
 import CETEI from 'CETEIcean';
 import serialize from "w3c-xmlserializer";
+
+import {BEHAVIOR_CSS_MAP} from "./behaviorsCSSMap";
+
 // reading in the XML file and processing it
 export class ProcessOddPm {
   oddDom: JSDOM;
@@ -12,7 +15,7 @@ export class ProcessOddPm {
   c = new CETEI();
   generatedCSS: string = "";
   constructor(){
-    this.oddDom = new JSDOM(fs.readFileSync('/Users/ekanshsahu/Documents/mith/astro-starter/src/pages/basicPM.odd', 'utf-8'), {contentType: "text/xml"});
+    this.oddDom = new JSDOM(fs.readFileSync('/Users/nola/Code/mith/tei-pages/src/pages/basicPM.odd', 'utf-8'), {contentType: "text/xml"});
     this.doc = this.oddDom.window.document;
     this.generatedCSS = ""; 
     this.teiDom = null; 
@@ -36,108 +39,16 @@ export class ProcessOddPm {
         if (applicable){
           const behaviour = model.getAttribute("behaviour")
           let behaviourCSS = "";
-          if (behaviour === "paragraph") {
-            behaviourCSS += 'display: block;\n margin-top: 1em;\n margin-bottom: 1em;\n text-align: justify;\n ';
+          if (behaviour) {
+            behaviourCSS = BEHAVIOR_CSS_MAP[behaviour] || "";
           }
-          if (behaviour === "alternate") {
-            behaviourCSS += 'display: inline;\n';
-          }
-        
-          if (behaviour === "anchor") {
-            behaviourCSS += 'display: inline; position: relative; text-decoration: none;\n';
-          }
-        
-          if (behaviour === "block") {
-            behaviourCSS += 'display: block; margin: 1em 0;\n';
-          }
-        
-          if (behaviour === "body") {
-            behaviourCSS += 'display: block;\n';
-          }
-        
-          if (behaviour === "break") {
-            behaviourCSS += 'content: "\\A"; white-space: pre;\n';
-          }
-        
-          if (behaviour === "cell") {
-            behaviourCSS += 'display: table-cell; padding: 0.5em; border: 1px solid #ddd;\n';
-          }
-        
-          if (behaviour === "cit") {
-            behaviourCSS += 'display: block; margin: 1em 2em; font-style: italic;\n';
-          }
-        
-          if (behaviour === "document") {
-            behaviourCSS += 'display: block;\n';
-          }
-        
-          if (behaviour === "figure") {
-            behaviourCSS += 'display: block; margin: 1em 0; text-align: center;\n';
-          }
-        
-          if (behaviour === "glyph") {
-            behaviourCSS += 'display: inline;\n';
-          }
-        
-          if (behaviour === "graphic") {
-            behaviourCSS += 'display: block; max-width: 100%; height: auto;\n';
-          }
-        
-          if (behaviour === "heading") {
-            behaviourCSS += 'display: block; font-weight: bold; font-size: 1.5em; margin: 1em 0 0.5em 0;\n';
-          }
-        
-          if (behaviour === "index") {
-            behaviourCSS += 'display: none;\n';
-          }
-        
-          if (behaviour === "inline") {
-            behaviourCSS += 'display: inline; \n';
-          }
-        
-          if (behaviour === "list") {
-            behaviourCSS += 'display: block; margin: 1em 0; padding-left: 2em;\n';
-          }
-        
-          if (behaviour === "listItem") {
-            behaviourCSS += 'display: list-item; list-style-type: disc; margin: 0.5em 0;\n';
-          }
-        
-          if (behaviour === "metadata") {
-            behaviourCSS += 'display: none;\n';
-          }
-        
-          if (behaviour === "note") {
-            behaviourCSS += 'display: inline; font-size: 0.9em; margin: 0.5em 2em; padding: 0.5em; background: #f5f5f5; border-left: 3px solid #ccc;\n';
-          }
-        
-          if (behaviour === "omit") {
-            behaviourCSS += 'display: none;\n';
-          }
-        
-          if (behaviour === "row") {
-            behaviourCSS += 'display: table-row;\n';
-          }
-        
-          if (behaviour === "section") {
-            behaviourCSS += 'display: block; margin: 2em 0; \n';
-          }
-        
-          if (behaviour === "table") {
-            behaviourCSS += 'display: table; border-collapse: collapse; margin: 1em 0; width: 100%;\n';
-          }
-        
-          if (behaviour === "text") {
-            behaviourCSS += 'display: inline;\n';
-          }
-        
-          if (behaviour === "title") {
-            behaviourCSS += 'display: block; font-weight: bold; font-size: 1.2em; margin: 0.5em 0;\n';
-          }
+
+
           // if the model has outputRendition(there can be multiple), add the direct CSS to the generated CSS. It looks like this:
           // <model behaviour="inline">
           //    <outputRendition>font-style: italic;</outputRendition>
           //  </model>
+
            
           let outputRenditions = model.querySelectorAll('outputRendition');
           let outputRenditionCSS = '';
@@ -196,9 +107,7 @@ export class ProcessOddPm {
       }
       return value;
     });
-    
     return serialized;
-
   }
 
   supportClass(teiFile: string) {
@@ -235,7 +144,7 @@ export class ProcessOddPm {
         }
       }
       // If there is no predicate, apply the class to all target nodes. 
-      else{
+      else {
         Array.from(targetNodes).forEach(elt => {
           elt.setAttribute(
             "class",(elt.getAttribute("class") || "") + " " + className
@@ -246,6 +155,3 @@ export class ProcessOddPm {
     return serialize(TEIDoc);
   }
 }
-
-
-

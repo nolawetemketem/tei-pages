@@ -54,7 +54,7 @@ const __TEI_BASE_ENABLED__ = true;
 				}
 			}
 
-		// keeps turning out to be null possible because the script is running befroe the html inside #tei-container is being rendered 
+		// keeps turning out to be null possible because the script is running before the html inside #tei-container is being rendered 
 		// so we need to add a document event listener, to wait for the DOM to be fully loaded
 		document.addEventListener('DOMContentLoaded', () => {
 			// The div element displaying the page has id "tei-container"
