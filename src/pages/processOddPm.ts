@@ -4,22 +4,27 @@ import pkg from 'fontoxpath';
 const {evaluateXPathToBoolean} = pkg;
 import CETEI from 'CETEIcean';
 import serialize from "w3c-xmlserializer";
-
-import {BEHAVIOR_CSS_MAP} from "./behaviorsCSSMap";
+import { BEHAVIOR_CSS_MAP } from "./behaviorsCSSMap";
 
 // reading in the XML file and processing it
 export class ProcessOddPm {
+
   oddDom: JSDOM;
   teiDom: JSDOM | null;
   doc: Document;
-  c = new CETEI();
+  c : any;
+
   generatedCSS: string = "";
+  buildTimeBehaviorMap: Record<string, string> = {};
+
   constructor(){
     this.oddDom = new JSDOM(fs.readFileSync('/Users/nola/Code/mith/tei-pages/src/pages/basicPM.odd', 'utf-8'), {contentType: "text/xml"});
     this.doc = this.oddDom.window.document;
     this.generatedCSS = ""; 
     this.teiDom = null; 
+    this.c = null
   }
+
   // Extract elementSpec and their respective models to get the behaviours and generate respective simple CSS that doesn't require js fpr functionality to ne implemented.
   processElSpecs() {
     // Have to add further behaviours to complexBehaviors method after link behaviour is finished. Similar pattern will be followed 
@@ -42,14 +47,12 @@ export class ProcessOddPm {
           if (behaviour) {
             behaviourCSS = BEHAVIOR_CSS_MAP[behaviour] || "";
           }
-
-
+          
           // if the model has outputRendition(there can be multiple), add the direct CSS to the generated CSS. It looks like this:
           // <model behaviour="inline">
           //    <outputRendition>font-style: italic;</outputRendition>
           //  </model>
 
-           
           let outputRenditions = model.querySelectorAll('outputRendition');
           let outputRenditionCSS = '';
           outputRenditions.forEach(outputRendition => {
@@ -68,13 +71,19 @@ export class ProcessOddPm {
     return this.generatedCSS;
   }
 
-  complexBehaviors() {
-    var c = new CETEI();
+
+  complexBehaviors(teiString : string) {
+    // Create a minimal JSDOM for CETEIcean
+    const teiDom = new JSDOM(teiString, { contentType: "text/xml" }).window.document;
+    // Set global variables so CETEIcean can work server-side
+    (global as any).document = teiDom;
+
+    this.c = new CETEI({ documentObject: teiDom, omitDefaultBehaviors : true});
+
     // read in ODD
     // determine elements with behavior="link"
     // traverse TEI data, find elements from previous steps
     // build behavior object and add entries for those elements with the serialized corresponding function.
-    
     let cbehaviors:any = {
       "namespaces": {
         "tei": "http://www.tei-c.org/ns/1.0",
@@ -82,32 +91,29 @@ export class ProcessOddPm {
       },
       "tei": {}
     }
-    
+
     const models = this.doc.querySelectorAll("model");
     for (let i = 0; i < models.length; i++) {
       const model = models[i];
       const behaviour = model.getAttribute("behaviour");
       const elSpec = model.parentNode as Element;
       const id = elSpec.getAttribute("ident")!;
-      if (behaviour === "link" && id) {
-        cbehaviors["tei"][id] = function linkFn(elt: Element) {
-          console.log("This is the element whose behaviour is getting added", elt);
-          const link = document.createElement("a");
-          const target =  elt.getAttribute("target")|| "#";
-          link.setAttribute("href", target);
-          link.textContent = elt.textContent || target;
-          return link;
+      if (behaviour && id) {
+        if (behaviour === "link") {
+          cbehaviors["tei"][id] = function linkFn(elt: Element) {
+            console.log("This is the element whose behaviour is getting added", elt);
+            const link = document.createElement("a");
+            const target =  elt.getAttribute("target")|| "#";
+            link.setAttribute("href", target);
+            link.textContent = elt.textContent || target;
+            return link;
+          }
         }
       }
     }
-    c.addBehaviors(cbehaviors);
-    const serialized = JSON.stringify(cbehaviors, (key, value) => {
-      if (typeof value === 'function') {
-        return value.toString();
-      }
-      return value;
-    });
-    return serialized;
+    this.c.addBehaviors(cbehaviors);
+    const html5Dom = this.c.domToHTML5(teiDom, undefined, null);
+    return serialize(html5Dom);
   }
 
   supportClass(teiFile: string) {
@@ -124,7 +130,7 @@ export class ProcessOddPm {
     function namespaceResolver(): string | null {
       return NS || null;
     }
-    // For all models in the ODD file, if there predicate is satisfied and class attribute is present, add the class to the target elements in the TEI file
+    // For all models in the ODD file, if predicate is satisfied and class attribute is present, add class to the target elements in the TEI file
     for (let i = 0; i < models.length; i++) {
       const model = models[i];
       const predicate = model.getAttribute("predicate");
