@@ -1,4 +1,4 @@
-// behaviorsCSSMap.ts
+// Data Mapping between behaviors and respective default CSS 
 
 export const BEHAVIOR_CSS_MAP: Record<string, string> = {
   paragraph: `
