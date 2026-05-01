@@ -2,11 +2,15 @@
 import * as fs from 'fs';
 import Layout from '../layouts/Layout.astro';
 import Alternate from '../components/Alternate.astro';
-import processTei from '../../node_modules/astro-tei/src/processTei.ts';
+import { fileURLToPath } from 'url';
+import { dirname, resolve } from 'path';
+import {processTei} from 'astro-tei';
 import Tei, {TeiBaseStyle} from 'astro-tei';
 import { ProcessOddPM } from './processOddPm';
+import type { coerce } from 'astro:schema';
 
-const oddPmPath = '/Users/nola/Code/mith/tei-pages/src/pages/basicPM.odd';
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const oddPmPath = resolve(__dirname, './basicPM.odd');
 
 export function getStaticPaths() { 
 	// Names of all the XML files that we intend to host and display on Astro
@@ -15,48 +19,33 @@ export function getStaticPaths() {
 }
 
 // For dynamic TEI file loading based on the URL parameter
-const { page } = Astro.params; 						
-const teiFile = (await import(`../tei/${page}.xml?raw`)).default;
-
-
+const { page } = Astro.params; 	
+const teiXML = (await import(`../tei/${page}.xml?raw`)).default;
 const oddPm = fs.readFileSync(oddPmPath, 'utf-8');
 
-const pm = new ProcessOddPM(oddPm); 							// Process TEI file to add custom CSS and behavior
+const pm = new ProcessOddPM(oddPm);  					// Process TEI file to add custom CSS and behavior
+const css = pm.getCSS();  								// gets non-exhaustive blanket CSS  
+const clientBehaviorsMap = pm.getClientBehaviors(); 	// gets blanket client-side behavior configurations from the ODD file
 
-const css = pm.getCSS(); 								// gets non-exhaustive blanket CSS 
-const teiWithCSS = pm.applyCSS(teiFile);
-
-const teiData = await processTei(teiWithCSS); 			// Gets custom elements to be registered with browser
-
-let html5 = pm.applyCETEI(teiWithCSS);
-html5 = html5.replace(/<(tei-[^\s\/]+)([^>]*?)\/>/gm, "<$1$2></$1>");
-
-// Get client-side behavior configurations from the ODD file
-const clientBehaviorsMap = pm.getClientBehaviors();
+const teiXMLCSS = pm.applyCSS(teiXML);
+const teiData = await processTei(teiXMLCSS); 			// Gets custom elements to be registered with browser
+const teiHtml5 = pm.applyCETEI(teiXMLCSS).replace(/<(tei-[^\s\/]+)([^>]*?)\/>/gm, "<$1$2></$1>");
 
 const __TEI_BASE_ENABLED__ = true; 
 const TEI_CONTAINER_ID = "tei-container"; 
 ---
 
 <Layout title="Astro TEI demo">
-
   <style set:html={css}></style>
 	{__TEI_BASE_ENABLED__ && <TeiBaseStyle/>}
-
 	<script> import CETEI from 'CETEIcean'; </script>
-
  	<main class="m-auto p-6 max-w-[65ch]">
 		<!-- Render alternate behavior component if alternate behaviors are defined -->
-		<!-- {
-			clientBehaviorsMap["alternate"] && clientBehaviorsMap["alternate"].length > 0 && (
-			<Alternate altBehaviors={clientBehaviorsMap["alternate"]} teiDataId={TEI_CONTAINER_ID} />
-		)} -->
 		<Alternate altBehaviors={clientBehaviorsMap["alternate"]} teiDataId={TEI_CONTAINER_ID} />
 		<!-- Injecting the HTML5 for rendering by the browser -->
 		<div class="shadow-2xl bg-amber-50 text-gray-700 p-4 mt-4 rounded-md tei-container" id={TEI_CONTAINER_ID} 
-		set:html={html5} 
+		set:html={teiHtml5} 
 		data-elements={teiData.elements.toString()} >
 		</div>
 	</main>
-
 </Layout>

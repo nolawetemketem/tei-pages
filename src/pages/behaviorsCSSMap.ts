@@ -1,4 +1,4 @@
-// Data Mapping between behaviors and respective default CSS 
+// Mapping between behaviors and respective default CSS 
 
 export const BEHAVIOR_CSS_MAP: Record<string, string> = {
   paragraph: `
@@ -127,7 +127,7 @@ export const BEHAVIOR_CSS_MAP: Record<string, string> = {
   text: `
     display: inline;
   `,
-
+  
   title: `
     display: block;
     font-weight: bold;

@@ -5,29 +5,45 @@ import CETEI from 'CETEIcean';
 import serialize from "w3c-xmlserializer";
 import { BEHAVIOR_CSS_MAP } from "./behaviorsCSSMap";
 
-
 // Processes given TEI-XML documents with respect to given processing model 'oddPM'.
 
 export class ProcessOddPM {
-
 
   oddDom: JSDOM;
   doc: Document;
   cetei : any;
   css: string = "";
   oddModels: NodeListOf<Element>;
-
+  clientBehaviorsMap: Record<string, any[]>;
 
   constructor(oddPM : string) {
+
     this.oddDom = new JSDOM(oddPM, {contentType: "text/xml"});
     this.doc = this.oddDom.window.document;
-    this.cetei = null
+    this.cetei = null;
     this.css = ""; 
+    this.clientBehaviorsMap = {};
     this.oddModels = this.doc.querySelectorAll("model");
 
+    this.buildCSS();
+    this.buildClientBehaviors();
+  }
+
+  // Get CSS is generated based on the behaviors and output renditions 
+  // only includes styles that don't require JS for complex behaviors.
+
+  getCSS() {
+    return this.css;
+  }
+
+  getClientBehaviors() {
+    return this.clientBehaviorsMap;
+  }
 
   // Extracts behaviours from elementSpec and their models  
   // Generates respective CSS from BEHAVIOR_CSS_MAP that doesn't require js 
+
+  buildCSS() {
 
     const elSpecs = this.doc.querySelectorAll("elementSpec");
 
@@ -44,6 +60,7 @@ export class ProcessOddPM {
         if (predicate) {
           applicable = evaluateXPathToBoolean(predicate, el, null, {}, {});
         }
+
         if (applicable) {
           const behaviour = model.getAttribute("behaviour");
           let behaviourCSS = (behaviour) ? BEHAVIOR_CSS_MAP[behaviour] || "" : "";
@@ -55,7 +72,7 @@ export class ProcessOddPM {
             outputRenditionCSS += `${outputRendition.textContent}\n`;
           });
 
-          if (cssClass){
+          if (cssClass) {
             this.css += `tei-${id}, .${cssClass} {\n ${behaviourCSS} ${outputRenditionCSS}}\n`;
           }
           this.css += `tei-${id} {\n ${behaviourCSS} ${outputRenditionCSS}}\n`;
@@ -64,14 +81,58 @@ export class ProcessOddPM {
     });
   }
 
+  // Extract client-side behavior configurations from ODD file
+  // Analyzes the ODD to determine which behaviors are needed and their configuration
+  // Returns a mapping of behaviors to their configurations
 
-  // Get CSS is generated based on the behaviors and output renditions 
-  // only includes styles that don't require JS for complex behaviors.
+  buildClientBehaviors() {
+    // Analyze models for client behaviors
+    this.oddModels.forEach((model) => {
+      const behavior = model.getAttribute("behaviour");
+      const id = (model.parentNode as Element).getAttribute("ident")!;
+      const predicate = model.getAttribute("predicate");
 
-  getCSS() {
-    return this.css;
+      if (behavior === "alternate") {
+        if (!this.clientBehaviorsMap["alternate"]) {
+          this.clientBehaviorsMap["alternate"] = [];
+        }
+        // Extract predicate ("sic and corr" -> ["sic", "corr"])
+        const matches  = (predicate) ? predicate.match(/\b([a-z]+)\b/g) : [];
+        let predicateEl : string[] = (matches) ? matches.filter(name => name !== "and") : [];
+        let defaultChoice : string | null = null, altChoice: string | null = null;  
+
+        if (predicateEl[0] && predicateEl[1]) {
+          defaultChoice = predicateEl[0];
+          altChoice = predicateEl[1];
+        }
+        
+        // get default and alternate from param elements
+        model.querySelectorAll("param").forEach((param) => {
+          const name = param.getAttribute("name"), value = param.getAttribute("value");
+          // Extract element name from xpath-like syntax (e.g., "corr[1]" -> "corr")
+          if (value) { 
+            const choiceEl = this.extractXPathName(value);
+            if(choiceEl) {
+              if (name === "default") {
+                defaultChoice = choiceEl;
+              } else if (name === "alternate") {
+                altChoice = choiceEl;
+              }
+            }
+          } 
+        });
+        // Build  array from extracted options
+        if (defaultChoice && altChoice) {        
+          this.clientBehaviorsMap["alternate"].push({
+            name: `alternate ${id}: ${predicate}`,
+            parent: id,
+            default: defaultChoice,
+            alternate: altChoice,
+          });
+        }
+      }
+    });
   }
-
 
   // Associates CSS with TEI elements, with respect to processing model
   // Returns the processed TEI as a string.
@@ -88,7 +149,7 @@ export class ProcessOddPM {
     function namespaceResolver(): string | null {
       return NS || null;
     }
-    
+
     // For all models in the ODD file, if predicate is satisfied and class attribute is present, add class to the target elements in the TEI file
     for (let i = 0; i < this.oddModels.length; i++) {
       const model = this.oddModels[i];
@@ -113,26 +174,13 @@ export class ProcessOddPM {
         });
       }
     }
-
-    // Mark alternate child elements for the Alternate behavior component
-    // Children of choice elements get marked with data-alternate-child attribute
-    // const choiceElements = teiDoc.getElementsByTagNameNS(NS, "choice");
-    // Array.from(choiceElements).forEach((choice) => {
-    //   Array.from(choice.children).forEach((child) => {
-    //     const childName = child.localName || child.nodeName.toLowerCase();
-    //     child.setAttribute("data-alternate-child", childName);
-    //   });
-    // });
-
     return serialize(teiDoc);
   }
 
+  // Uses CETEIcean to apply behaviors specified in the ODD file to the TEI document. 
+  // Returns processed TEI as a string.
 
-
-// Uses CETEIcean to apply behaviors specified in the ODD file to the TEI document. 
-// Returns processed TEI as a string.
-
-applyCETEI(teiString : string) {
+  applyCETEI(teiString : string) {
 
     // minimal JSDOM and vars to use CETEIcean server-side
     const teiDom = new JSDOM(teiString, { contentType: "text/xml" }).window.document;
@@ -163,72 +211,19 @@ applyCETEI(teiString : string) {
           }
         }
       }
+
     }
     this.cetei.addBehaviors(cBehaviors);
     return serialize(this.cetei.domToHTML5(teiDom, undefined, null));
   }
 
-  // Extract client-side behavior configurations from ODD file
-  // Analyzes the ODD to determine which behaviors are needed and their configuration
-  // Returns a mapping of behaviors to their configurations
-  
-  getClientBehaviors(): Record<string, any[]>{
-    const clientBehaviorsMap: Record<string, any[]> = {};
-    const allElementSpecs = new Map();
-    // First pass: collect all element specs for reference
-    this.doc.querySelectorAll("elementSpec").forEach((spec) => {
-      const ident = spec.getAttribute("ident")!;
-      allElementSpecs.set(ident, spec);
-    });
-    // Analyze models for client behaviors
-    this.oddModels.forEach((model) => {
-
-      const behavior = model.getAttribute("behaviour");
-      const elSpec = model.parentNode as Element;
-      const id = elSpec.getAttribute("ident")!;
-      const predicate = model.getAttribute("predicate");
-
-      if (behavior === "alternate") {
-        if (!clientBehaviorsMap["alternate"]) {
-          clientBehaviorsMap["alternate"] = [];
-        }
-        // Extract predicate ("sic and corr" -> ["sic", "corr"])
-        // let predicateEl : string [] = [];
-        // if (predicate) {
-        //   // Match element names in predicate like "sic and corr" or "abbr and expan"
-        //   const matches = predicate.match(/\b([a-z]+)\b/g);
-        //   if (matches) {
-        //     predicateElements = matches.filter(name => name !== "and"); // Filter out logical operators
-        //   }
-        // }
-        // get default and alternate from param elements
-        let defaultChoice: string | null = null,  altChoice: string | null = null;
-        model.querySelectorAll("param").forEach((param) => {
-          const name = param.getAttribute("name"), value = param.getAttribute("value");
-          if (value) { // Extract element name from xpath-like syntax (e.g., "corr[1]" -> "corr")
-            const choiceEl = value.match(/^([a-z]+)/)?.[1];
-            if(choiceEl) {
-              if (name === "default") {
-                defaultChoice = choiceEl;
-              } else if (name === "alternate") {
-                altChoice = choiceEl;
-              }
-            }
-          }
-          // Build  array from extracted options
-          if (defaultChoice && altChoice) {
-            clientBehaviorsMap["alternate"].push({
-              name: `alternate ${id}: ${predicate}`,
-              parent: id,
-              default: defaultChoice,
-              alternate: altChoice,
-            });
-          }
-        });
-      }
-
-      
-    });
-    return clientBehaviorsMap;
+  // Extract first element/attribute name from various XPath patterns
+  extractXPathName(value: string): string | null {
+    return value
+      .replace(/^\/\//, '')      // Remove leading // 
+      .replace(/^child::/, '')   // Remove explicit axis
+      .replace(/^@/, '')         // Remove @ for attributes
+      .replace(/\[.*$/, '')      // Remove predicates [1], [@attr='val']
+      .replace(/^([a-zA-Z]+).*$/, '$1') || null;
   }
 }
