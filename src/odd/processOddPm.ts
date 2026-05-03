@@ -3,7 +3,9 @@ import pkg from 'fontoxpath';
 const {evaluateXPathToBoolean} = pkg;
 import CETEI from 'CETEIcean';
 import serialize from "w3c-xmlserializer";
-import { BEHAVIOR_CSS_MAP } from "./behaviorsCSSMap";
+import * as fs from 'fs';
+import type { TeiPagesConfig } from "../odd/teipages.config";
+import { BEHAVIOR_CSS_MAP } from "../odd/behaviorsCSSMap";
 
 // Processes given TEI-XML documents with respect to given processing model 'oddPM'.
 
@@ -16,8 +18,8 @@ export class ProcessOddPM {
   oddModels: NodeListOf<Element>;
   clientBehaviorsMap: Record<string, any[]>;
 
-  constructor(oddPM : string) {
-
+  constructor(config: TeiPagesConfig) {
+    const oddPM = fs.readFileSync(config.odd, 'utf-8');
     this.oddDom = new JSDOM(oddPM, {contentType: "text/xml"});
     this.doc = this.oddDom.window.document;
     this.cetei = null;
@@ -86,6 +88,7 @@ export class ProcessOddPM {
   // Returns a mapping of behaviors to their configurations
 
   buildClientBehaviors() {
+    
     // Analyze models for client behaviors
     this.oddModels.forEach((model) => {
       const behavior = model.getAttribute("behaviour");
@@ -162,7 +165,6 @@ export class ProcessOddPM {
       if (cssClass && predicate) {
         for (const node of targetNodes) {
           const shouldApply = evaluateXPathToBoolean(predicate, node, null, namespaceResolver);
-          // console.log("Predicate:", predicate, "on node:", node, "evaluated to:", shouldApply);
           // Only apply class if predicate passes
           if (shouldApply) {
             node.setAttribute("class", ((node.getAttribute("class") || "") + " " + cssClass).trim());
@@ -176,6 +178,7 @@ export class ProcessOddPM {
     }
     return serialize(teiDoc);
   }
+
 
   // Uses CETEIcean to apply behaviors specified in the ODD file to the TEI document. 
   // Returns processed TEI as a string.
@@ -211,8 +214,8 @@ export class ProcessOddPM {
           }
         }
       }
-
     }
+
     this.cetei.addBehaviors(cBehaviors);
     return serialize(this.cetei.domToHTML5(teiDom, undefined, null));
   }

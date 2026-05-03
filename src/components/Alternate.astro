@@ -1,4 +1,5 @@
 ---
+// Alternate behavior configuration from the TEI processing output.
 type AlternateBehavior = {
   name: string;
   parent: string;
@@ -6,130 +7,92 @@ type AlternateBehavior = {
   alternate?: string;
 };
 
+// Props passed from the page: alternate behavior options and TEI container ID.
 const { altBehaviors = [], teiDataId = '' } : { altBehaviors?: AlternateBehavior[]; teiDataId?: string } = Astro.props;
-console.log('Alternate component props:', { altBehaviors, teiDataId });
-
+const showControls = altBehaviors.length > 0;
 ---
 
-{ altBehaviors.length > 0 ? (
+{showControls ? (
   <div class="alternate-controls fixed right-0 top-1/2 transform -translate-y-1/2 w-80 max-h-96 bg-blue-50 border border-blue-200 rounded-md shadow-lg p-4 overflow-y-auto z-50">
-    <div class="flex justify-between items-center mb-2">
-      <h3 class="text-lg font-semibold text-blue-800">Alternate Content Controls</h3>
-      {/* <button class="close-alternate text-blue-600 hover:text-blue-800 text-xl font-bold" aria-label="Close">&times;</button> */}
-    </div>
-    <div class="flex flex-wrap gap-2">
-      <form class="text-sm text-blue-600">
-      {altBehaviors.map((altBehavior) => (
-        <div class="w-full mb-2"> 
+    <h3 class="mb-3 text-lg font-semibold text-blue-800">Alternate Content Controls</h3>
+    <form class="space-y-3 text-sm text-blue-600">
+      {altBehaviors.map((behavior) => {
+        return ( <div class="w-full mb-2"> 
           <input checked
               type="radio"
               class="alternate-radio mr-1"
-              name={altBehavior.name}
-              id={altBehavior.default}
-              value={altBehavior.default}
-              data-other-option={altBehavior.alternate}
-              data-parent={altBehavior.parent}
+              name={behavior.name}
+              id={behavior.default}
+              value={behavior.default}
+              data-other={behavior.alternate}
+              data-parent={behavior.parent}
           /> 
-          <label for={altBehavior.default}>{altBehavior.default}</label>
+          <label for={behavior.default}>{behavior.default}</label>
           &nbsp; &nbsp; 
           <input 
               type="radio"
               class="alternate-radio mr-1"
-              name={altBehavior.name}
-              id={altBehavior.alternate}
-              value={altBehavior.alternate}
-              data-other-option={altBehavior.default}
-              data-parent={altBehavior.parent}
+              name={behavior.name}
+              id={behavior.alternate}
+              value={behavior.alternate}
+              data-other={behavior.default}
+              data-parent={behavior.parent}
             />
-          <label for={altBehavior.alternate}>{altBehavior.alternate}</label>
-        </div>
-      ))}
-      </form>
-    </div>
+          <label for={behavior.alternate}>{behavior.alternate}</label>
+        </div> );
+      })}
+    </form>
   </div>
 ) : null}
 
-
 <script define:vars={{ altBehaviors, teiDataId }}>
-  class AlternateHandler {
-    constructor(altBehaviors, teiDataId) {
-      this.altBehaviors = altBehaviors;
-      this.teiDataId = teiDataId;
-      this.init();
-    }
+  // Get the rendered TEI container by ID.
+  const getContainer = () => document.getElementById(teiDataId);
 
-    init() {
-      console.log('AlternateHandler initialized', { altBehaviorsCount: this.altBehaviors.length, teiDataId: this.teiDataId });
-      const radioButtons = document.querySelectorAll('.alternate-radio');
-      radioButtons.forEach(radio => {
-        radio.addEventListener('change', (e) => {
-          const radioButton = e.target;
-          const parent = radioButton.getAttribute('data-parent');
-          const checked = radioButton.getAttribute('value');
-          const unchecked = radioButton.getAttribute('data-other-option');    
-          this.alternateContent(parent, checked, unchecked);
-        });
+  // Show the selected choice and hide its alternate option.
+  const toggleChoice = (parent, show, hide) => {
+    const container = getContainer();
+    if (!container) return;
+
+    const choiceElements = container.querySelectorAll(`[data-origname="${parent}"]`);
+    const selector = [show, hide].filter(Boolean).map(name => `tei-${CSS.escape(name)}`).join(', ');
+
+    choiceElements.forEach((choiceEl) => {
+      const options = choiceEl.querySelectorAll(selector);
+      options.forEach((optionEl) => {
+        optionEl.style.display = optionEl.tagName.toLowerCase() === `tei-${show}` ? '' : 'none';
       });
-      
-      // const closeButton = document.querySelector('.close-alternate');
-      // if (closeButton) {
-      //   closeButton.addEventListener('click', () => {
-      //     const controls = document.querySelector('.alternate-controls');
-      //     if (controls) {
-      //       controls.style.display = 'none';
-      //     }
-      //   });
-      // }
-      this.altBehaviors.forEach((altBehavior) => {
-        if (altBehavior.default && altBehavior.alternate) {
-          this.alternateContent( altBehavior.parent, altBehavior.default, altBehavior.alternate);
-        }
-      });
-    }
-
-    alternateContent(parent, checked, unchecked) {
-      // console.log('alternateContent called with:', {parent, checked, unchecked});
-      const container = document.getElementById(this.teiDataId);
-      if (!container) {
-        console.log('AlternateHandler could not find container', { teiDataId: this.teiDataId });
-        return;
-      }
-      // console.log('container:', {container});
-      // SHOULD I CHANGE ALL IN DOCUMENT OR JUST THOSE WITHIN CHOICE????
-      let choiceElements = container.querySelectorAll(`[data-origname="${parent}"]`);
-      // console.log('choiceElements:', {choiceElements});
-      choiceElements.forEach((choiceEl) => {
-        const selectors = [`tei-${CSS.escape(checked)}`];
-        if (unchecked) {
-          selectors.push(`tei-${CSS.escape(unchecked)}`);
-        }
-        const options = choiceEl.querySelectorAll(selectors.join(', '));
-        // console.log('options:', {options});
-        options.forEach((optionEl) => {
-          optionEl.style.display = 
-            optionEl.tagName.toLowerCase() === `tei-${checked}` ? '' : 'none';
-        });
-      });
-    }
-  }
-
-
-  // waits for  TEI container to be available before initializing the AlternateHandler
-  const checkContainer = () => { 
-    const container = document.getElementById(teiDataId);
-    if (container) {
-      console.log('TEI container found, initializing AlternateHandler');
-      new AlternateHandler(altBehaviors, teiDataId);
-    } else {
-      console.log('TEI container not found yet, waiting...');
-      setTimeout(checkContainer, 100);
-    }
+    });
   };
-  
-  if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', checkContainer);
-  } else {
-    checkContainer();
-  }
 
+  // Wait until the TEI container exists, then wire up radio controls.
+  const init = () => {
+    const container = getContainer();
+    if (!container) {
+      setTimeout(init, 100);
+      return;
+    }
+
+    document.querySelectorAll('.alternate-controls input[type="radio"]').forEach((radio) => {
+      radio.addEventListener('change', () => {
+        const show = radio.value;
+        const hide = radio.getAttribute('data-other');
+        const parent = radio.getAttribute('data-parent');
+        if (parent && show) toggleChoice(parent, show, hide);
+      });
+    });
+
+    // Initialize with the default alternate state.
+    altBehaviors.forEach((behavior) => {
+      if (behavior.default && behavior.alternate) {
+        toggleChoice(behavior.parent, behavior.default, behavior.alternate);
+      }
+    });
+  };
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
 </script>

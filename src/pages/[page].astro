@@ -1,16 +1,13 @@
 ---
-import * as fs from 'fs';
+
 import Layout from '../layouts/Layout.astro';
 import Alternate from '../components/Alternate.astro';
 import { fileURLToPath } from 'url';
 import { dirname, resolve } from 'path';
 import {processTei} from 'astro-tei';
 import Tei, {TeiBaseStyle} from 'astro-tei';
-import { ProcessOddPM } from './processOddPm';
-import type { coerce } from 'astro:schema';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
-const oddPmPath = resolve(__dirname, './basicPM.odd');
+import { ProcessOddPM } from '../odd/processOddPm';
+import { config } from '../odd/teipages.config';
 
 export function getStaticPaths() { 
 	// Names of all the XML files that we intend to host and display on Astro
@@ -21,9 +18,8 @@ export function getStaticPaths() {
 // For dynamic TEI file loading based on the URL parameter
 const { page } = Astro.params; 	
 const teiXML = (await import(`../tei/${page}.xml?raw`)).default;
-const oddPm = fs.readFileSync(oddPmPath, 'utf-8');
 
-const pm = new ProcessOddPM(oddPm);  					// Process TEI file to add custom CSS and behavior
+const pm = new ProcessOddPM(config);   					// Process TEI file to add custom CSS and behavior
 const css = pm.getCSS();  								// gets non-exhaustive blanket CSS  
 const clientBehaviorsMap = pm.getClientBehaviors(); 	// gets blanket client-side behavior configurations from the ODD file
 
