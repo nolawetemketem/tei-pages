@@ -55,9 +55,9 @@ ODD Processing Model
 tei-pages/
 ├── src/
 │   ├── pages/
-│   │   ├── [page].astro      # Dynamic route for TEI documents
-|   ├──odd/
-│   |   ├── basicPM.odd       # Sample processing model  
+│   │   └── [page].astro      # Dynamic route for TEI documents
+│   ├── odd/
+│   │   ├── basicPM.odd       # Sample processing model  
 │   │   ├── processOddPm.ts   # ODD processing engine
 │   │   └── behaviorsCSSMap.ts# Behavior-to-CSS mapping
 │   ├──components/
