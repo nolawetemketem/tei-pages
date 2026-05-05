@@ -17,31 +17,36 @@ TEI documents are machine-readable but not human-readable. TEI Pages bridges tha
 
 ## How It Works
 
-TEI Pages takes two inputs and produces a styled web page:
+TEI Pages takes a document with set of styling rules (*.odd Processing Model)
 
-| Input | Description |
-|-------|-------------|
-| TEI XML | Your encoded document |
-| ODD | Processing model defining how each element should render |
+Using those rules, it will generate stylized webpages from TEI XML
+
+| Input      | Description |
+|------------|-------------|
+| ODD        | Processing model defining how each element should render |
+| TEI XML(s) | Your encoded document(s) |
+
 
 ### The Pipeline
 
 ```
-TEI XML + ODD Processing Model
+ODD Processing Model
          │
          ▼
-┌─────────────────────────────┐
-│  ProcessOddPM              │
-│  • Parse ODD                │
-│  • Generate CSS             │
-│  • Extract behaviors        │
-└─────────────────────────────┘
+┌─────────────────────────────────────┐
+│ Configuration: ProcessOddPM         │ <──── via constructor(config)
+│  • Parses ODD                       │
+│  • Generates CSS                    │
+│  • Gets client-side behaviors       │
+│ Usage: ProcessOddPM + TEI           │ <──── via applyCSS(tei) & applyCETEI(tei)
+│  • Attach CSS                       │
+│  • XML to HTML5                     │
+│  • Attaches client-side logic       │
+└─────────────────────────────────────┘
+    
          │
          ▼
-    Styled HTML5
-         │
-         ▼
-    Rendered Web Page
+    Rendered Web Page 
 ```
 
 ## Project Structure
@@ -51,16 +56,17 @@ tei-pages/
 ├── src/
 │   ├── pages/
 │   │   ├── [page].astro      # Dynamic route for TEI documents
+|   ├──odd/
+│   |   ├── basicPM.odd       # Sample processing model  
 │   │   ├── processOddPm.ts   # ODD processing engine
-│   │   ├── basicPM.odd       # Sample processing model
 │   │   └── behaviorsCSSMap.ts# Behavior-to-CSS mapping
-│   ├── components/
+│   ├──components/
 │   │   └── Alternate.astro   # Interactive alternate content controls
-│   ├── tei/                  # Sample TEI XML files
+│   ├──tei/                   # Sample TEI XML files
 │   │   ├── testTEI.xml
 │   │   ├── testAlternate.xml
 │   │   └── ...
-│   └── layouts/
+│   └──layouts/
 │       └── Layout.astro      # Base page layout
 ├── astro.config.mjs
 └── package.json
